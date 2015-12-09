@@ -253,11 +253,7 @@ public class SuggestionViewPanel
 
         AnnotationFS fsClicked = selectByAddr(clickedJCas, aAddress);
 
-        //
-        if (aLinkFeature != null && aLink != null) {
-
-        }
-        if(MergeCas.existsSameAnnoOnPosition(fsClicked,aMergeJCas)){
+        if(MergeCas.existsSameAnnoOnPosition(fsClicked,aMergeJCas) && !aSlot){
 
             throw new BratAnnotationException("Same Annotation exists on the mergeview."
                     + " Please add it manually. ");
@@ -399,6 +395,18 @@ public class SuggestionViewPanel
 
             // this is a slot
             if (fsArcaddress.contains(".")) {
+
+                if(!MergeCas.existsSameAnnoOnPosition(fsClicked,aJcas)){
+
+                    throw new BratAnnotationException("The base annotation do not exist."
+                            + " Please add it first. ");
+                }
+
+                if(targetFs==null){
+                    throw new BratAnnotationException("The target annotation do not exist."
+                            + " Please add it first. ");
+                }
+
 
                 Integer fiIndex = Integer.parseInt(fsArcaddress.split("\\.")[1]);
                 Integer liIndex = Integer.parseInt(fsArcaddress.split("\\.")[2]);
