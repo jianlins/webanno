@@ -25,7 +25,6 @@ import static de.tudarmstadt.ukp.clarin.webanno.brat.controller.BratAjaxCasUtil.
 import static de.tudarmstadt.ukp.clarin.webanno.brat.controller.BratAjaxCasUtil.selectByAddr;
 import static de.tudarmstadt.ukp.clarin.webanno.brat.controller.BratAjaxCasUtil.selectSentenceAt;
 import static de.tudarmstadt.ukp.clarin.webanno.brat.controller.BratAjaxCasUtil.selectSingleFsAt;
-import static de.tudarmstadt.ukp.clarin.webanno.brat.controller.BratAjaxCasUtil.setFeature;
 import static de.tudarmstadt.ukp.clarin.webanno.brat.controller.TypeUtil.getAdapter;
 
 import java.io.IOException;
@@ -34,7 +33,6 @@ import java.util.List;
 
 import de.tudarmstadt.ukp.clarin.webanno.brat.curation.MergeCas;
 import org.apache.uima.UIMAException;
-import org.apache.uima.cas.CAS;
 import org.apache.uima.cas.Feature;
 import org.apache.uima.cas.FeatureStructure;
 import org.apache.uima.cas.text.AnnotationFS;
@@ -265,12 +263,12 @@ public class SuggestionViewPanel
         AnnotationLayer layer = annotationService.getLayer(layerId);
 
         if(existingAnnos.size()==0 || layer.isAllowStacking()){
-            MergeCas.copyAnnotation(fsClicked,aMergeJCas);
+            MergeCas.copySpanAnnotation(fsClicked,aMergeJCas);
         }
 
         // b) if stacking is not allowed, modify the existing annotation with this one
         else  {
-            MergeCas.modifyAnnotation(fsClicked, existingAnnos.get(0), aMergeJCas);
+            MergeCas.modifySpanAnnotation(fsClicked, existingAnnos.get(0), aMergeJCas);
         }
 
 
@@ -365,6 +363,7 @@ public class SuggestionViewPanel
     {
         Integer addressOriginClicked = aRequest.getParameterValue("originSpanId").toInteger();
         Integer addressTargetClicked = aRequest.getParameterValue("targetSpanId").toInteger();
+
         String arcType = removePrefix(aRequest.getParameterValue("type").toString());
         String fsArcaddress = aRequest.getParameterValue("arcId").toString();
 
@@ -391,21 +390,18 @@ public class SuggestionViewPanel
         catch (IOException e1) {
             throw new IOException();
         }
+
+        long layerId = TypeUtil.getLayerId(arcType);
+
+        AnnotationLayer layer = annotationService.getLayer(layerId);
+        int address = Integer.parseInt(fsArcaddress.split("\\.")[0]);
+        AnnotationFS fsClicked = selectByAddr(clickedJCas, address);
+
         AnnotationFS originFsClicked = selectByAddr(clickedJCas, addressOriginClicked);
         AnnotationFS targetFsClicked = selectByAddr(clickedJCas, addressTargetClicked);
 
-        AnnotationFS originFs = selectSingleFsAt(aJcas, originFsClicked.getType(),
-                originFsClicked.getBegin(), originFsClicked.getEnd());
-
-        AnnotationFS targetFs = selectSingleFsAt(aJcas, targetFsClicked.getType(),
-                targetFsClicked.getBegin(), targetFsClicked.getEnd());
-
-            long layerId = TypeUtil.getLayerId(arcType);
-
-            AnnotationLayer layer = annotationService.getLayer(layerId);
-            int address = Integer.parseInt(fsArcaddress.split("\\.")[0]);
-            AnnotationFS fsClicked = selectByAddr(clickedJCas, address);
-
+        AnnotationFS originFs = null;
+        AnnotationFS targetFs = null;
             // this is a slot arc
             if (fsArcaddress.contains(".")) {
                 if(!MergeCas.existsSameAnnoOnPosition(fsClicked,aJcas)){
@@ -449,43 +445,40 @@ public class SuggestionViewPanel
 
             // normal relation annotation arc is clicked
             else {
+
+                originFs = MergeCas.getSource(originFsClicked, aJcas).findFirst().orElse(null);
+                targetFs = MergeCas.getTarget(targetFsClicked, aJcas).findFirst().orElse(null);
+
                 // check if target/source exists in the mergeview
                 if(originFs == null || targetFs == null){
                     throw  new BratAnnotationException("Both the source and target annotation"
                             + " should exist on the mergeview. Please first copy/create them");
                 }
-                ArcAdapter adapter = (ArcAdapter) getAdapter(annotationService, layer);
-                
-                Sentence sentence = selectSentenceAt(aJcas, bModel.getSentenceBeginOffset(),
-                        bModel.getSentenceEndOffset());
-                int start = sentence.getBegin();
-                int end = selectByAddr(aJcas,
-                        Sentence.class, getLastSentenceAddressInDisplayWindow(aJcas,
-                                getAddr(sentence), bModel.getPreferences().getWindowSize()))
-                                        .getEnd();
-                if(MergeCas.existsSameAnnoOnPosition(fsClicked,aJcas)){
-                    // if the target and source also already exists
-                    if(MergeCas.existsSameAnnoOnPosition(originFs, aJcas) ||
-                            MergeCas.existsSameAnnoOnPosition(targetFs, aJcas))
+
+                if(MergeCas.getSource(originFsClicked, aJcas).count()>1){
+                    throw new BratAnnotationException("Stacked sources exist in mergeview. "
+                            + "Cannot copy this relation.");
+
+                }
+                if(MergeCas.getSource(targetFsClicked, aJcas).count()>1){
+                    throw new BratAnnotationException("Stacked targets exist in mergeview. "
+                            + "Cannot copy this relation.");
+
+                }
+
+
+
+                if (MergeCas.existsSameAnnoOnPosition(fsClicked, aJcas)) {
                     throw new BratAnnotationException("Same Annotation exists on the mergeview."
                             + " Please add it manually. ");
                 }
 
-                // Add annotation - we set no feature values yet.
-                int selectedSpanId = getAddr(adapter.add(originFs, targetFs, aJcas, start, end, null,
-                        null));
-
-                // Set the feature values
-                for (AnnotationFeature feature : annotationService.listAnnotationFeature(layer)) {
-                    if (feature.getName().equals(WebAnnoConst.COREFERENCE_RELATION_FEATURE)) {
-                        continue;
-                    }
-                    if (feature.isEnabled()) {
-                        Feature uimaFeature = fsClicked.getType().getFeatureByBaseName(
-                                feature.getName());
-                        adapter.updateFeature(aJcas, feature, selectedSpanId,
-                                fsClicked.getFeatureValueAsString(uimaFeature));
-                    }
+                List<AnnotationFS> existingAnnos = MergeCas.getAnnosOnPosition(fsClicked, aJcas);
+                if(existingAnnos.size()==0 || layer.isAllowStacking()){
+                    MergeCas.copyRelationAnnotation(fsClicked,originFs,targetFs, aJcas);
+                }
+                else {
+                    MergeCas.modifyRelationAnnotation(fsClicked,existingAnnos.get(0), aJcas);
                 }
             }
             repository.writeCas(bModel.getMode(), bModel.getDocument(), bModel.getUser(), aJcas);

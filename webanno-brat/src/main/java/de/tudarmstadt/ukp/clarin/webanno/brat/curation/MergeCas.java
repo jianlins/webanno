@@ -25,6 +25,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Stream;
 
 import org.apache.uima.cas.ArrayFS;
 import org.apache.uima.cas.CAS;
@@ -34,6 +35,7 @@ import org.apache.uima.cas.Type;
 import org.apache.uima.cas.text.AnnotationFS;
 import org.apache.uima.fit.factory.JCasFactory;
 import org.apache.uima.fit.util.CasUtil;
+import org.apache.uima.fit.util.JCasUtil;
 import org.apache.uima.jcas.JCas;
 
 import de.tudarmstadt.ukp.clarin.webanno.api.WebAnnoConst;
@@ -443,6 +445,7 @@ public class MergeCas {
 		return false;
 	}
 
+
 	public static List<AnnotationFS> getAnnosOnPosition(AnnotationFS aFs, JCas aJcas)
 	{
 		Type type = aFs.getType();
@@ -453,7 +456,7 @@ public class MergeCas {
 	 *
 	 * Copy this same annotation from the user annotation to the mergeview
 	 */
-	public static void copyAnnotation(AnnotationFS aOldFs, JCas aJCas)
+	public static void copySpanAnnotation(AnnotationFS aOldFs, JCas aJCas)
 	{
 		Feature[] features = getAllFeatures(aOldFs);
 		Type type = aOldFs.getType();
@@ -468,11 +471,38 @@ public class MergeCas {
 		aJCas.addFsToIndexes(newFs);
 	}
 
+
+	public static void copyRelationAnnotation(AnnotationFS aOldFs, AnnotationFS asourceFS,
+			AnnotationFS aTargetFs, JCas aJCas)
+	{
+		Feature[] features = getAllFeatures(aOldFs);
+		Type type = aOldFs.getType();
+		Feature sourceFeat = type.getFeatureByBaseName(WebAnnoConst.FEAT_REL_SOURCE);
+		Feature targetFeat = type.getFeatureByBaseName(WebAnnoConst.FEAT_REL_TARGET);
+		AnnotationFS newFs = aJCas.getCas()
+				.createAnnotation(type, aOldFs.getBegin(), aOldFs.getEnd());
+		for (Feature f : features) {
+			if(isLinkOrBasicFeatures(aOldFs,f)){
+				continue;
+			}
+			if(f.equals(sourceFeat)){
+				newFs.setFeatureValue(f,asourceFS);
+			}
+			else if (f.equals(targetFeat)){
+				newFs.setFeatureValue(f,aTargetFs);
+			}
+			else {
+				setFeatureValue(newFs, f, getFeatureValue(aOldFs, f));
+			}
+		}
+		aJCas.addFsToIndexes(newFs);
+	}
+
 	/**
 	 *
 	 * Modify existing non-stackable annotations from one of the users annotation
      */
-	public static void modifyAnnotation(AnnotationFS aOldFs, AnnotationFS aNewFs, JCas aJCas){
+	public static void modifySpanAnnotation(AnnotationFS aOldFs, AnnotationFS aNewFs, JCas aJCas){
 		Feature[] features = getAllFeatures(aOldFs);
 		for(Feature f: features) {
 			if(isLinkOrBasicFeatures(aOldFs,f)){
@@ -481,6 +511,44 @@ public class MergeCas {
 			setFeatureValue(aNewFs, f, getFeatureValue(aOldFs, f));
 		}
 		aJCas.addFsToIndexes(aNewFs);
+	}
+
+	public static void modifyRelationAnnotation(AnnotationFS aOldFs, AnnotationFS aNewFs, JCas aJCas){
+		Feature[] features = getAllFeatures(aOldFs);
+		Type type = aOldFs.getType();
+		Feature sourceFeat = type.getFeatureByBaseName(WebAnnoConst.FEAT_REL_SOURCE);
+		Feature targetFeat = type.getFeatureByBaseName(WebAnnoConst.FEAT_REL_TARGET);
+
+		for(Feature f: features) {
+			if(isLinkOrBasicFeatures(aOldFs,f)){
+				continue;
+			}
+			if(f.equals(sourceFeat)){
+				continue;
+			}
+			else if (f.equals(targetFeat)){
+				continue;
+			}
+
+			setFeatureValue(aNewFs, f, getFeatureValue(aOldFs, f));
+		}
+		aJCas.addFsToIndexes(aNewFs);
+	}
+
+	public static Stream<AnnotationFS> getSource(AnnotationFS aOldSourceFs, JCas aJCas)
+	{
+		Type type = aOldSourceFs.getType();
+		return CasUtil
+				.selectCovered(aJCas.getCas(), type, aOldSourceFs.getBegin(), aOldSourceFs.getEnd())
+				.stream().filter(fs -> isSameAnno(fs, aOldSourceFs));
+	}
+
+	public static Stream<AnnotationFS> getTarget(AnnotationFS aTargetFs, JCas aJCas)
+	{
+		Type type = aTargetFs.getType();
+		return CasUtil
+				.selectCovered(aJCas.getCas(), type, aTargetFs.getBegin(), aTargetFs.getEnd())
+				.stream().filter(fs -> isSameAnno(fs, aTargetFs));
 	}
 
 	private static boolean isLinkOrBasicFeatures(FeatureStructure aOldFs, Feature aFeature)
