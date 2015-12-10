@@ -393,9 +393,8 @@ public class SuggestionViewPanel
             int address = Integer.parseInt(fsArcaddress.split("\\.")[0]);
             AnnotationFS fsClicked = selectByAddr(clickedJCas, address);
 
-            // this is a slot
+            // this is a slot arc
             if (fsArcaddress.contains(".")) {
-
                 if(!MergeCas.existsSameAnnoOnPosition(fsClicked,aJcas)){
 
                     throw new BratAnnotationException("The base annotation do not exist."
@@ -434,7 +433,14 @@ public class SuggestionViewPanel
                 createSpan(arcType, aCurationUserSegment.getBratAnnotatorModel(), aJcas,
                         clickedAnnotationDocument, address, slotFeature, linkRole, true);
             }
+
+            // normal relation annotation arc is clicked
             else {
+                // check if target/source exists in the mergeview
+                if(originFs == null || targetFs == null){
+                    throw  new BratAnnotationException("Both the source and target annotation"
+                            + " should exist on the mergeview. Please first copy/create them");
+                }
                 ArcAdapter adapter = (ArcAdapter) getAdapter(annotationService, layer);
                 
                 Sentence sentence = selectSentenceAt(aJcas, bModel.getSentenceBeginOffset(),
@@ -444,6 +450,14 @@ public class SuggestionViewPanel
                         Sentence.class, getLastSentenceAddressInDisplayWindow(aJcas,
                                 getAddr(sentence), bModel.getPreferences().getWindowSize()))
                                         .getEnd();
+                if(MergeCas.existsSameAnnoOnPosition(fsClicked,aJcas)){
+                    // if the target and source also already exists
+                    if(MergeCas.existsSameAnnoOnPosition(originFs, aJcas) ||
+                            MergeCas.existsSameAnnoOnPosition(targetFs, aJcas))
+                    throw new BratAnnotationException("Same Annotation exists on the mergeview."
+                            + " Please add it manually. ");
+                }
+
                 // Add annotation - we set no feature values yet.
                 int selectedSpanId = getAddr(adapter.add(originFs, targetFs, aJcas, start, end, null,
                         null));
