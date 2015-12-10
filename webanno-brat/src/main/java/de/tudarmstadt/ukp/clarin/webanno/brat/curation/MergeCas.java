@@ -79,13 +79,13 @@ public class MergeCas {
 		Set<FeatureStructure> slotFeaturesToReset = new HashSet<>();
 		Set<FeatureStructure> annotationsToDelete = new HashSet<>();
 
-		Set<String> users = new HashSet<>();
+		Set<String> users = aJCases.keySet();
+
 		for (Position position : aDiff.getPositions()) {
 
 			Map<String, List<FeatureStructure>> annosPerUser = new HashMap<>();
 
 			ConfigurationSet cfgs = aDiff.getConfigurtionSet(position);
-			users = cfgs.getCasGroupIds();
 
 			if (cfgs.getConfigurations(CurationPanel.CURATION_USER).size() == 0) { // incomplete
 																					// annotations
