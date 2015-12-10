@@ -259,15 +259,28 @@ public class SuggestionViewPanel
                     + " Please add it manually. ");
         }
 
+        // a) if stacking allowed add this new annotation to the mergeview
+        List<AnnotationFS> existingAnnos = MergeCas.getAnnosOnPosition(fsClicked, aMergeJCas);
         long layerId = TypeUtil.getLayerId(spanType);
         AnnotationLayer layer = annotationService.getLayer(layerId);
+
+        if(existingAnnos.size()==0 || layer.isAllowStacking()){
+            MergeCas.copyAnnotation(fsClicked,aMergeJCas);
+        }
+
+        // b) if stacking is not allowed, modify the existing annotation with this one
+        else  {
+            MergeCas.modifyAnnotation(fsClicked, existingAnnos.get(0), aMergeJCas);
+        }
+
+
         SpanAdapter adapter = (SpanAdapter) getAdapter(annotationService, layer);
 
         // Add annotation - we set no feature values yet.
         AnnotationFS fs = adapter.updateCurationCas(aMergeJCas.getCas(), fsClicked.getBegin(),
                 fsClicked.getEnd(), null, null, fsClicked, aSlot);
 
-        // if slot link is copied from the suggestion
+  /*      // if slot link is copied from the suggestion
         if (aLinkFeature != null && aLink != null) {
 
             List<LinkWithRoleModel> links = getFeature(fs, aLinkFeature);
@@ -312,7 +325,7 @@ public class SuggestionViewPanel
                     }
                 }
             }
-        }
+        }*/
         repository
                 .writeCas(aBModel.getMode(), aBModel.getDocument(), aBModel.getUser(), aMergeJCas);
 

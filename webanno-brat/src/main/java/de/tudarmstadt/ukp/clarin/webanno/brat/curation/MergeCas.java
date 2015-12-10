@@ -32,6 +32,7 @@ import org.apache.uima.cas.Feature;
 import org.apache.uima.cas.FeatureStructure;
 import org.apache.uima.cas.Type;
 import org.apache.uima.cas.text.AnnotationFS;
+import org.apache.uima.fit.factory.JCasFactory;
 import org.apache.uima.fit.util.CasUtil;
 import org.apache.uima.jcas.JCas;
 
@@ -401,6 +402,37 @@ public class MergeCas {
 		}
 	}
 
+	public static void setFeatureValue(FeatureStructure aFS, Feature aFeature, Object aValue) {
+		switch (aFeature.getRange().getName()) {
+		case CAS.TYPE_NAME_STRING:
+			 aFS.setStringValue(aFeature, aValue.toString());
+			break;
+		case CAS.TYPE_NAME_BOOLEAN:
+			 aFS.setBooleanValue(aFeature, Boolean.getBoolean(aValue.toString()));
+			break;
+		case CAS.TYPE_NAME_FLOAT:
+			 aFS.setFloatValue(aFeature, Float.valueOf(aValue.toString()));
+			break;
+		case CAS.TYPE_NAME_INTEGER:
+			 aFS.setIntValue(aFeature, Integer.valueOf(aValue.toString()));
+			break;
+		case CAS.TYPE_NAME_BYTE:
+			 aFS.setByteValue(aFeature, Byte.valueOf(aValue.toString()));
+			break;
+		case CAS.TYPE_NAME_DOUBLE:
+			 aFS.setDoubleValue(aFeature, Double.valueOf(aValue.toString()));
+			break;
+		case CAS.TYPE_NAME_LONG:
+			aFS.setLongValue(aFeature, Long.getLong(aValue.toString()));
+			break;
+		case CAS.TYPE_NAME_SHORT:
+			aFS.setShortValue(aFeature, Short.valueOf(aValue.toString()));
+			break;
+		default:
+			return ;
+		// return aFS.getFeatureValue(aFeature);
+		}
+	}
 	public static boolean existsSameAnnoOnPosition(AnnotationFS aFs, JCas aJcas)
 	{
 		for(AnnotationFS annotationFS: getAnnosOnPosition(aFs, aJcas)){
@@ -415,5 +447,54 @@ public class MergeCas {
 	{
 		Type type = aFs.getType();
 		return CasUtil.selectCovered(aJcas.getCas(), type, aFs.getBegin(), aFs.getEnd());
+	}
+
+	/**
+	 *
+	 * Copy this same annotation from the user annotation to the mergeview
+	 */
+	public static void copyAnnotation(AnnotationFS aOldFs, JCas aJCas)
+	{
+		Feature[] features = getAllFeatures(aOldFs);
+		Type type = aOldFs.getType();
+		AnnotationFS newFs = aJCas.getCas()
+				.createAnnotation(type, aOldFs.getBegin(), aOldFs.getEnd());
+		for (Feature f : features) {
+			if(isLinkOrBasicFeatures(aOldFs,f)){
+				continue;
+			}
+			setFeatureValue(newFs, f, getFeatureValue(aOldFs, f));
+		}
+		aJCas.addFsToIndexes(newFs);
+	}
+
+	/**
+	 *
+	 * Modify existing non-stackable annotations from one of the users annotation
+     */
+	public static void modifyAnnotation(AnnotationFS aOldFs, AnnotationFS aNewFs, JCas aJCas){
+		Feature[] features = getAllFeatures(aOldFs);
+		for(Feature f: features) {
+			if(isLinkOrBasicFeatures(aOldFs,f)){
+				continue;
+			}
+			setFeatureValue(aNewFs, f, getFeatureValue(aOldFs, f));
+		}
+		aJCas.addFsToIndexes(aNewFs);
+	}
+
+	private static boolean isLinkOrBasicFeatures(FeatureStructure aOldFs, Feature aFeature)
+	{
+		if (isLinkMode(aOldFs, aFeature)) {
+			return true;
+		}
+		if (isBasicFeature(aFeature)) {
+			return true;
+		}
+		if (aFeature.getName().equals(CAS.FEATURE_FULL_NAME_BEGIN) || aFeature.getName()
+				.equals(CAS.FEATURE_FULL_NAME_END)) {
+			return true;
+		}
+		return false;
 	}
 }
