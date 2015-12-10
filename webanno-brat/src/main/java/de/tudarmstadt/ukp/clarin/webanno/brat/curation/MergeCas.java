@@ -162,7 +162,7 @@ public class MergeCas {
 					Map<String, ArrayFS> roleAnnosPerUser = new HashMap<>();
 
 					setAllRoleAnnosOnPosition(aJCases, roleAnnosPerUser, users, baseFs, roleFeature);
-					List<FeatureStructure> linkFSes = new LinkedList<FeatureStructure>(
+					List<FeatureStructure> linkFSes = new LinkedList<>(
 							Arrays.asList(roleFss.toArray()));
 					for (FeatureStructure roleFs : roleFss.toArray()) {
 
@@ -535,21 +535,14 @@ public class MergeCas {
 		aJCas.addFsToIndexes(aNewFs);
 	}
 
-	public static Stream<AnnotationFS> getSource(AnnotationFS aOldSourceFs, JCas aJCas)
+	public static Stream<AnnotationFS> getMergeFS(AnnotationFS aOldFs, JCas aJCas)
 	{
-		Type type = aOldSourceFs.getType();
+		Type type = aOldFs.getType();
 		return CasUtil
-				.selectCovered(aJCas.getCas(), type, aOldSourceFs.getBegin(), aOldSourceFs.getEnd())
-				.stream().filter(fs -> isSameAnno(fs, aOldSourceFs));
+				.selectCovered(aJCas.getCas(), type, aOldFs.getBegin(), aOldFs.getEnd())
+				.stream().filter(fs -> isSameAnno(fs, aOldFs));
 	}
 
-	public static Stream<AnnotationFS> getTarget(AnnotationFS aTargetFs, JCas aJCas)
-	{
-		Type type = aTargetFs.getType();
-		return CasUtil
-				.selectCovered(aJCas.getCas(), type, aTargetFs.getBegin(), aTargetFs.getEnd())
-				.stream().filter(fs -> isSameAnno(fs, aTargetFs));
-	}
 
 	private static boolean isLinkOrBasicFeatures(FeatureStructure aOldFs, Feature aFeature)
 	{

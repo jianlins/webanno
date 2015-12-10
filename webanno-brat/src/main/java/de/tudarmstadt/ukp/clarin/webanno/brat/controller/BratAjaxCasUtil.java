@@ -845,7 +845,7 @@ public class BratAjaxCasUtil
 
                 if (linksList != null) {
                     // remove duplicate links
-                    Set<LinkWithRoleModel> links = new HashSet<LinkWithRoleModel>(linksList);
+                    Set<LinkWithRoleModel> links = new HashSet<>(linksList);
                     for (LinkWithRoleModel e : links) {
                         // Skip links that have been added in the UI but where the target has not
                         // yet been
