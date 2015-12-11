@@ -443,7 +443,7 @@ public class SuggestionViewPanel
                 targetFs = targets.get(0);
             }
 
-            List<AnnotationFS> existingAnnos = MergeCas.getAnnosOnPosition(clickedFS, aJcas);
+            List<AnnotationFS> existingAnnos = MergeCas.getRelAnnosOnPosition(clickedFS, originFs, targetFs, aJcas);
             if (existingAnnos.size() == 0 || layer.isAllowStacking()) {
                 MergeCas.copyRelationAnnotation(clickedFS, originFs, targetFs, aJcas);
             }
