@@ -17,13 +17,7 @@
  ******************************************************************************/
 package de.tudarmstadt.ukp.clarin.webanno.brat.curation.component;
 
-import static de.tudarmstadt.ukp.clarin.webanno.brat.controller.BratAjaxCasUtil.getAddr;
-import static de.tudarmstadt.ukp.clarin.webanno.brat.controller.BratAjaxCasUtil.getFeature;
-import static de.tudarmstadt.ukp.clarin.webanno.brat.controller.BratAjaxCasUtil.getLastSentenceAddressInDisplayWindow;
-import static de.tudarmstadt.ukp.clarin.webanno.brat.controller.BratAjaxCasUtil.getSentenceBeginAddress;
-import static de.tudarmstadt.ukp.clarin.webanno.brat.controller.BratAjaxCasUtil.getSentenceNumber;
-import static de.tudarmstadt.ukp.clarin.webanno.brat.controller.BratAjaxCasUtil.selectByAddr;
-import static de.tudarmstadt.ukp.clarin.webanno.brat.controller.BratAjaxCasUtil.selectSentenceAt;
+import static de.tudarmstadt.ukp.clarin.webanno.brat.controller.BratAjaxCasUtil.*;
 import static de.tudarmstadt.ukp.clarin.webanno.brat.controller.TypeUtil.getAdapter;
 
 import java.io.IOException;
@@ -33,11 +27,15 @@ import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import de.tudarmstadt.ukp.clarin.webanno.api.WebAnnoConst;
 import de.tudarmstadt.ukp.clarin.webanno.brat.controller.BratAjaxCasUtil;
 import de.tudarmstadt.ukp.clarin.webanno.brat.curation.MergeCas;
 import org.apache.uima.UIMAException;
+import org.apache.uima.cas.Feature;
 import org.apache.uima.cas.FeatureStructure;
+import org.apache.uima.cas.Type;
 import org.apache.uima.cas.text.AnnotationFS;
+import org.apache.uima.fit.util.CasUtil;
 import org.apache.uima.jcas.JCas;
 import org.apache.wicket.MarkupContainer;
 import org.apache.wicket.ajax.AjaxRequestTarget;
@@ -77,8 +75,6 @@ import de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Sentence;
 /**
  * A {@link MarkupContainer} for either curation users' sentence annotation (for the lower panel) or
  * the automated annotations
- *
- *
  */
 public class SuggestionViewPanel
         extends WebMarkupContainer
@@ -94,8 +90,7 @@ public class SuggestionViewPanel
     /**
      * Data models for {@link BratAnnotator}
      *
-     * @param aModel
-     *            the model.
+     * @param aModel the model.
      */
     public void setModel(IModel<LinkedList<CurationUserSegmentForAnnotationDocument>> aModel)
     {
@@ -233,20 +228,18 @@ public class SuggestionViewPanel
         }
 
         createSpan(spanType, aCurationUserSegment.getBratAnnotatorModel(), aJcas,
-                clickedAnnotationDocument, address, null, null, false);
+                clickedAnnotationDocument, address);
     }
 
     private void createSpan(String spanType, BratAnnotatorModel aBModel, JCas aMergeJCas,
-            AnnotationDocument aAnnotationDocument, int aAddress, AnnotationFeature aLinkFeature,
-            LinkWithRoleModel aLink, boolean aSlot)
+            AnnotationDocument aAnnotationDocument, int aAddress)
             throws IOException, UIMAException, ClassNotFoundException, BratAnnotationException
     {
         JCas clickedJCas = getJCas(aBModel, aAnnotationDocument);
 
         AnnotationFS fsClicked = selectByAddr(clickedJCas, aAddress);
 
-        if (MergeCas.existsSameAnnoOnPosition(fsClicked, aMergeJCas) && !aSlot) {
-
+        if (MergeCas.existsSameAnnoOnPosition(fsClicked, aMergeJCas)) {
             throw new BratAnnotationException(
                     "Same Annotation exists on the mergeview." + " Please add it manually. ");
         }
@@ -265,59 +258,6 @@ public class SuggestionViewPanel
             MergeCas.modifySpanAnnotation(fsClicked, existingAnnos.get(0), aMergeJCas);
         }
 
-        SpanAdapter adapter = (SpanAdapter) getAdapter(annotationService, layer);
-
-        // Add annotation - we set no feature values yet.
-        AnnotationFS fs = adapter
-                .updateCurationCas(aMergeJCas.getCas(), fsClicked.getBegin(), fsClicked.getEnd(),
-                        null, null, fsClicked, aSlot);
-
-  /*      // if slot link is copied from the suggestion
-        if (aLinkFeature != null && aLink != null) {
-
-            List<LinkWithRoleModel> links = getFeature(fs, aLinkFeature);
-            links.add(aLink);
-            setFeature(fs, aLinkFeature, links);
-        }
-        // Set the feature values
-        else {
-            for (AnnotationFeature feature : annotationService.listAnnotationFeature(layer)) {
-                if (feature.getName().equals(WebAnnoConst.COREFERENCE_RELATION_FEATURE)) {
-                    continue;
-                }
-                // slot span is copied from the suggestion to the curation
-                if (feature.getLinkMode() != LinkMode.NONE) {
-                    List<LinkWithRoleModel> links = getFeature(fs, feature);
-                    setFeature(fs, feature, links);
-                    continue;
-                }
-                else if (feature.isEnabled()) {
-                    Feature uimaFeature = fsClicked.getType()
-                            .getFeatureByBaseName(feature.getName());
-                    switch (feature.getType()) {
-                    case CAS.TYPE_NAME_STRING:
-                        adapter.updateFeature(aMergeJCas, feature, getAddr(fs),
-                                fsClicked.getFeatureValueAsString(uimaFeature));
-                        break;
-                    case CAS.TYPE_NAME_BOOLEAN:
-                        adapter.updateFeature(aMergeJCas, feature, getAddr(fs),
-                                fsClicked.getBooleanValue(uimaFeature));
-                        break;
-                    case CAS.TYPE_NAME_FLOAT:
-                        adapter.updateFeature(aMergeJCas, feature, getAddr(fs),
-                                fsClicked.getFloatValue(uimaFeature));
-                        break;
-                    case CAS.TYPE_NAME_INTEGER:
-                        adapter.updateFeature(aMergeJCas, feature, getAddr(fs),
-                                fsClicked.getIntValue(uimaFeature));
-                        break;
-                    default:
-                        adapter.updateFeature(aMergeJCas, feature, getAddr(fs),
-                                fsClicked.getFeatureValue(uimaFeature));
-                    }
-                }
-            }
-        }*/
         repository
                 .writeCas(aBModel.getMode(), aBModel.getDocument(), aBModel.getUser(), aMergeJCas);
 
@@ -385,20 +325,20 @@ public class SuggestionViewPanel
 
         List<AnnotationFS> merges = MergeCas.getMergeFS(clickedFS, aJcas)
                 .collect(Collectors.toList());
-        if (merges.size() == 0) {
-            throw new BratAnnotationException(
-                    "The base annotation do not exist." + " Please add it first. ");
-        }
-        AnnotationFS mergeFs = merges.get(0);
 
-        AnnotationFS originFsClicked = selectByAddr(clickedJCas, addressOriginClicked);
-        AnnotationFS targetFsClicked = selectByAddr(clickedJCas, addressTargetClicked);
+        AnnotationFS originFsClicked  = selectByAddr(clickedJCas, addressOriginClicked);
+        AnnotationFS targetFsClicked  = selectByAddr(clickedJCas, addressTargetClicked);
 
         AnnotationFS originFs = null;
         AnnotationFS targetFs = null;
         // this is a slot arc
         if (fsArcaddress.contains(".")) {
 
+            if (merges.size() == 0) {
+                throw new BratAnnotationException(
+                        "The base annotation do not exist." + " Please add it first. ");
+            }
+            AnnotationFS mergeFs = merges.get(0);
             Integer fiIndex = Integer.parseInt(fsArcaddress.split("\\.")[1]);
             Integer liIndex = Integer.parseInt(fsArcaddress.split("\\.")[2]);
 
@@ -418,7 +358,6 @@ public class SuggestionViewPanel
                             List<AnnotationFS> targets = MergeCas
                                     .getMergeFS(selectByAddr(clickedJCas, link.targetAddr), aJcas)
                                     .collect(Collectors.toList());
-
 
                             if (targets.size() == 0) {
                                 throw new BratAnnotationException(
@@ -441,7 +380,17 @@ public class SuggestionViewPanel
                 }
                 fi++;
             }
-            BratAjaxCasUtil.setFeature(mergeFs, slotFeature, Arrays.asList(linkRole));
+            List<LinkWithRoleModel> links = getFeature(mergeFs, slotFeature);
+            LinkWithRoleModel duplicateLink = null; //
+            for (LinkWithRoleModel lr : links) {
+                if (lr.targetAddr == linkRole.targetAddr) {
+                    duplicateLink = lr;
+                }
+            }
+            links.add(linkRole);
+            links.remove(duplicateLink);
+
+            setFeature(mergeFs, slotFeature, links);
         }
 
         // normal relation annotation arc is clicked
@@ -451,14 +400,16 @@ public class SuggestionViewPanel
                     .collect(Collectors.toList());
             List<AnnotationFS> targets = MergeCas.getMergeFS(targetFsClicked, aJcas)
                     .collect(Collectors.toList());
-            originFs = origins.get(0);
-            targetFs = targets.get(0);
+
 
             // check if target/source exists in the mergeview
-            if (originFs == null || targetFs == null) {
+            if (origins.size() ==0 || targets.size() ==0) {
                 throw new BratAnnotationException("Both the source and target annotation"
                         + " should exist on the mergeview. Please first copy/create them");
             }
+
+            originFs = origins.get(0);
+            targetFs = targets.get(0);
 
             if (origins.size() > 1) {
                 throw new BratAnnotationException(
@@ -470,8 +421,30 @@ public class SuggestionViewPanel
                         "Stacked targets exist in mergeview. " + "Cannot copy this relation.");
 
             }
+            if(merges.size()>0){
+                throw new BratAnnotationException("The annotation already exists on the mergeview. "
+                        + "Add this manually to have stacked annotations");
+            }
 
-            List<AnnotationFS> existingAnnos = MergeCas.getAnnosOnPosition(clickedFS, aJcas);
+            // TODO: DKpro Dependency layer-> It should be done differently
+            if(layer.getAttachType()!=null){
+                Type type = clickedFS.getType();
+                Feature sourceFeature = type.getFeatureByBaseName(WebAnnoConst.FEAT_REL_SOURCE);
+                originFsClicked = (AnnotationFS) clickedFS.getFeatureValue(sourceFeature);
+
+                Feature targetFeature = type.getFeatureByBaseName(WebAnnoConst.FEAT_REL_TARGET);
+                targetFsClicked = (AnnotationFS) clickedFS.getFeatureValue(targetFeature);
+
+                origins = MergeCas.getMergeFS(originFsClicked, aJcas)
+                        .collect(Collectors.toList());
+               targets = MergeCas.getMergeFS(targetFsClicked, aJcas)
+                        .collect(Collectors.toList());
+                originFs = origins.get(0);
+                targetFs = targets.get(0);
+            }
+
+            List<AnnotationFS> existingAnnos = MergeCas.getMergeFS(clickedFS, aJcas).collect(
+                    Collectors.toList());
             if (existingAnnos.size() == 0 || layer.isAllowStacking()) {
                 MergeCas.copyRelationAnnotation(clickedFS, originFs, targetFs, aJcas);
             }

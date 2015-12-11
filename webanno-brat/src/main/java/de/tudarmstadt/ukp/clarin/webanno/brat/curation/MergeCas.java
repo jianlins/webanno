@@ -27,6 +27,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Stream;
 
+import de.tudarmstadt.ukp.dkpro.core.api.lexmorph.type.pos.POS;
+import de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Token;
 import org.apache.uima.cas.ArrayFS;
 import org.apache.uima.cas.CAS;
 import org.apache.uima.cas.Feature;
@@ -258,9 +260,9 @@ public class MergeCas {
 		int end = ((AnnotationFS) fs).getEnd();
 
 		List<FeatureStructure> fssAtThisPosition = new ArrayList<>();
-		for (FeatureStructure fss : CasUtil.selectCovered(aJCases.get(aUser).getCas(), t, begin, end)) {
-			fssAtThisPosition.add(fss);
-		}
+		CasUtil.selectCovered(aJCases.get(aUser).getCas(), t, begin, end).forEach(fss ->
+			fssAtThisPosition.add(fss));
+
 		return fssAtThisPosition;
 	}
 
@@ -407,7 +409,7 @@ public class MergeCas {
 	public static void setFeatureValue(FeatureStructure aFS, Feature aFeature, Object aValue) {
 		switch (aFeature.getRange().getName()) {
 		case CAS.TYPE_NAME_STRING:
-			 aFS.setStringValue(aFeature, aValue.toString());
+			 aFS.setStringValue(aFeature, aValue==null?null:aValue.toString());
 			break;
 		case CAS.TYPE_NAME_BOOLEAN:
 			 aFS.setBooleanValue(aFeature, Boolean.getBoolean(aValue.toString()));
@@ -468,9 +470,18 @@ public class MergeCas {
 			}
 			setFeatureValue(newFs, f, getFeatureValue(aOldFs, f));
 		}
+		if(type.getName().equals(POS.class.getName())){
+			updateToken(newFs);
+		}
 		aJCas.addFsToIndexes(newFs);
 	}
+	private static void updateToken (AnnotationFS aPos){
 
+		Type type = CasUtil.getType(aPos.getCAS(), Token.class.getTypeName());
+		Feature attachFeature = type.getFeatureByBaseName("pos");
+		CasUtil.selectCovered(aPos.getCAS(), type, aPos.getBegin(), aPos.getEnd()).get(0)
+				.setFeatureValue(attachFeature, aPos);
+	}
 
 	public static void copyRelationAnnotation(AnnotationFS aOldFs, AnnotationFS asourceFS,
 			AnnotationFS aTargetFs, JCas aJCas)
